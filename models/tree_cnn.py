@@ -38,12 +38,12 @@ class TreeCNN(nn.Module):
         :return: Predictions for the future.
         """
         region_map = self.tree.regions
-        preds = torch.zeros(1, self.params["output_dim"], *self.params["input_size"])
+        preds = torch.zeros(x.shape[0], self.params["output_dim"], *self.params["input_size"])
         for k in range(self.tree.num_regions):
             model_output = self.cnns[k](x)
             preds += torch.mul(model_output, region_map[:, :, :, k].unsqueeze(dim=1)
                                .repeat(1, self.params["output_dim"], 1, 1))
-        return preds.permute(1, 0, 2, 3)
+        return preds
 
     def fit(self, x, y):
         """
@@ -51,13 +51,14 @@ class TreeCNN(nn.Module):
 
         :param x: Tensor of input images (T, D, M, N).
         :param y: Tensor of output images (T, D, M, N).
-        :return: None.
+        :return: Loss.
         """
         self.optimizer.zero_grad()
         y_hat = self(x)
-        loss = self.criterion(y_hat, y)
+        loss = 1/x.shape[0] * self.criterion(y_hat, y)
         loss.backward()
         self.optimizer.step()
+        return loss.item()
 
     def predict(self, x):
         """

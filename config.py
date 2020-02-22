@@ -53,4 +53,4 @@ class TreeCNNParams:
         self.input_size = INPUT_SIZE
         self.output_dim = KSTEP
         self.batch_size = 64
-        self.lr = 1e-5
+        self.lr = 1e-1

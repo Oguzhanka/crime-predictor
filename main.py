@@ -3,11 +3,14 @@ Main script for testing the model flow.
 """
 import config
 from models.tree_cnn import TreeCNN
-
+from data_processor import DataProcessor
 from fake_data_generator import generate_batch
-
+import matplotlib.pyplot as plt
 
 if __name__ == "__main__":
+    data_processor = DataProcessor(24, 10, 8)
+    tensor = data_processor.read_file_to_tensor("data/crimes")
+
     params = config.TreeCNNParams().__dict__
 
     model = TreeCNN(params)

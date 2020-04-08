@@ -9,7 +9,8 @@ import matplotlib.pyplot as plt
 
 if __name__ == "__main__":
     data_processor = DataProcessor(24, 10, 8)
-    tensor = data_processor.read_file_to_tensor("data/crimes")
+
+    crime_tensor, weather_tensor = data_processor.read_file_to_tensor("crimes")
 
     params = config.TreeCNNParams().__dict__
 

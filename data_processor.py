@@ -9,7 +9,7 @@ import torch
 
 class DataProcessor:
     def __init__(self, time_period, lat_grid_num, lon_grid_num):
-        self.file_path = os.getenv("FILE_PATH", "data/crimes10k.csv")
+        self.file_path = os.getenv("FILE_PATH", "data/crimes.csv")
         self.weather_file_path = os.getenv("WEATHER_FILE_PATH", "data/weather.csv")
         self.time_period = time_period
         self.lat_grid_num = lat_grid_num
@@ -21,9 +21,11 @@ class DataProcessor:
         self.grid_values = None
         self.time_period_range = 0
         self.start_time = 978339600
-        self.end_time = 1512000000
+        self.end_time = 1581713400
         self.data = []
         self.weather_data = []
+        self.weather_file_data = []
+        self.weather_file_data_desc = dict()
         self.flat_data = []
         self.flat_weather_data = []
 
@@ -38,36 +40,36 @@ class DataProcessor:
                         lat, long = self.row_to_grid(row)
                         if lat and long:
                             period = self.row_to_period(row)
-                            weather_period = self.row_to_period_weather(self.weather_data[weather_row_count])
-                            if period == weather_period:
-                                self.weather_data[period - 1][lat - 1][long - 1][-1] += 1
-                        self.data[period - 1][lat - 1][long - 1][-1] += 1
+                            if weather_row_count < len(self.weather_file_data):
+                                weather_period = self.row_to_period_weather(self.weather_file_data[weather_row_count])
+                                for weather_lat in range(self.lat_grid_num):
+                                    for weather_lon in range(self.lon_grid_num):
+                                        self.weather_data[weather_period - 1][weather_lat - 1][weather_lon - 1][-1] \
+                                            = self.weather_file_data_desc[self.weather_file_data[weather_row_count][1]]
+                            self.data[period - 1][lat - 1][long - 1][-1] += 1
+                            weather_row_count += 1
                 line_count += 1
 
     def read_weather_data_from_csv(self):
-        with open(self.file_path) as csv_file:
+        with open(self.weather_file_path) as csv_file:
             csv_reader = csv.reader(csv_file, delimiter=',')
             line_count = 0
+            desc = []
             for row in csv_reader:
                 if line_count != 0:
-                    self.weather_data.append(row)
+                    self.weather_file_data.append(row)
+                    desc.append(row[1])
                 line_count += 1
+            unique_desc = list(set(desc))
+            label = 0
+            for unique in unique_desc:
+                self.weather_file_data_desc[unique] = label
+                label += 1
 
-    def read_to_tensor(self):
+    def __read_and_flat_data(self):
         self.divide_grid_descriptions()
         self.divide_time_periods()
-        print("Data divided to time periods.")
-        print("Data structure created.")
-        self.read_data_from_csv()
-        print("Data distributed into data structure.")
-        self.flat_read_data()
-        print("Data flattened.")
-        return self.data_to_tensor()
-
-    def read_to_file(self, file_name):
-        self.divide_grid_descriptions()
-        self.divide_time_periods()
-        print("Data divided to time periods.")
+        print("Data divided into time periods.")
         print("Data structure created.")
         self.read_weather_data_from_csv()
         self.read_data_from_csv()
@@ -75,29 +77,47 @@ class DataProcessor:
         self.flat_read_data()
         self.flat_read_weather_data()
         print("Data flattened.")
-        # with open(file_name, 'w') as csv_file:
-        #     csv_file.writelines("%s\n" % crime_grid for crime_grid in self.flat_data)
 
-        with open("weather_" + file_name, 'w') as csv_file:
+    def read_to_tensor(self):
+        self.__read_and_flat_data()
+        return self.data_to_tensor()
+
+    def read_to_file(self, file_name):
+        self.__read_and_flat_data()
+        with open("data/" + file_name, 'w') as csv_file:
+            csv_file.writelines("%s\n" % crime_grid for crime_grid in self.flat_data)
+        with open("data/weather_" + file_name, 'w') as csv_file:
             csv_file.writelines("%s\n" % crime_grid for crime_grid in self.flat_weather_data)
-        print("Data written into weather_" + str(file_name) + ".")
+        print("Data written into data/weather_" + str(file_name) + " and data/" + file_name + ".")
 
     def data_to_tensor(self):
         tensor = torch.zeros(self.time_period_range, self.lat_grid_num, self.lon_grid_num, 1)
+        tensor_weather = torch.zeros(self.time_period_range, self.lat_grid_num, self.lon_grid_num, 1)
         for row in self.flat_data:
             tensor[row[0], row[1], row[2], :] = row[-1]
-        return tensor
+        for row in self.flat_weather_data:
+            tensor[row[0], row[1], row[2], :] = row[-1]
+        return tensor, tensor_weather
 
     def read_file_to_tensor(self, file_name):
-        with open(file_name, mode='r') as file:
+        with open("data/" + file_name, mode='r') as file:
             lines = file.readlines()
             self.time_period_range = ast.literal_eval(lines[-1])[0] + 1
             tensor = torch.zeros(self.time_period_range, self.lat_grid_num, self.lon_grid_num, 1)
             for line in lines:
                 line = ast.literal_eval(line)
                 tensor[line[0], line[1], line[2], :] = line[-1]
+
+        with open("data/weather_" + file_name, mode='r') as file:
+            lines = file.readlines()
+            self.time_period_range = ast.literal_eval(lines[-1])[0] + 1
+            tensor_weather = torch.zeros(self.time_period_range, self.lat_grid_num, self.lon_grid_num, 1)
+            for line in lines:
+                line = ast.literal_eval(line)
+                tensor_weather[line[0], line[1], line[2], :] = line[-1]
         print("Data transformed to torch.tensor")
-        return tensor
+
+        return tensor, tensor_weather
 
     def flat_read_data(self):
         for period in self.data:
@@ -111,7 +131,7 @@ class DataProcessor:
             for lat in period:
                 for lon in lat:
                     self.flat_weather_data.append(lon)
-        del self.data
+        del self.weather_file_path
 
     def divide_time_periods(self):
         date_range = self.end_time - self.start_time
@@ -199,4 +219,4 @@ class DataProcessor:
 
     @staticmethod
     def get_time_weather(row):
-        return int(datetime.strptime(row[2], "%Y-%m-%d %I:%M:%S").timestamp())
+        return int(datetime.strptime(row[0], "%Y-%m-%d %H:%M:%S").timestamp())

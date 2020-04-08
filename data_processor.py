@@ -9,7 +9,8 @@ import torch
 
 class DataProcessor:
     def __init__(self, time_period, lat_grid_num, lon_grid_num):
-        self.file_path = os.getenv("FILE_PATH", "data/crimes.csv")
+        self.file_path = os.getenv("FILE_PATH", "data/crimes10k.csv")
+        self.weather_file_path = os.getenv("WEATHER_FILE_PATH", "data/weather.csv")
         self.time_period = time_period
         self.lat_grid_num = lat_grid_num
         self.lon_grid_num = lon_grid_num
@@ -20,21 +21,36 @@ class DataProcessor:
         self.grid_values = None
         self.time_period_range = 0
         self.start_time = 978339600
-        self.end_time = 1581713400
+        self.end_time = 1512000000
         self.data = []
+        self.weather_data = []
         self.flat_data = []
+        self.flat_weather_data = []
 
     def read_data_from_csv(self):
         with open(self.file_path) as csv_file:
             csv_reader = csv.reader(csv_file, delimiter=',')
             line_count = 0
+            weather_row_count = 0
             for row in csv_reader:
                 if line_count != 0:
                     if row[19] and row[20]:
                         lat, long = self.row_to_grid(row)
                         if lat and long:
                             period = self.row_to_period(row)
+                            weather_period = self.row_to_period_weather(self.weather_data[weather_row_count])
+                            if period == weather_period:
+                                self.weather_data[period - 1][lat - 1][long - 1][-1] += 1
                         self.data[period - 1][lat - 1][long - 1][-1] += 1
+                line_count += 1
+
+    def read_weather_data_from_csv(self):
+        with open(self.file_path) as csv_file:
+            csv_reader = csv.reader(csv_file, delimiter=',')
+            line_count = 0
+            for row in csv_reader:
+                if line_count != 0:
+                    self.weather_data.append(row)
                 line_count += 1
 
     def read_to_tensor(self):
@@ -53,13 +69,18 @@ class DataProcessor:
         self.divide_time_periods()
         print("Data divided to time periods.")
         print("Data structure created.")
+        self.read_weather_data_from_csv()
         self.read_data_from_csv()
         print("Data distributed into data structure.")
         self.flat_read_data()
+        self.flat_read_weather_data()
         print("Data flattened.")
-        with open(file_name, 'w') as csv_file:
-            csv_file.writelines("%s\n" % crime_grid for crime_grid in self.flat_data)
-        print("Data written into " + str(file_name) + ".")
+        # with open(file_name, 'w') as csv_file:
+        #     csv_file.writelines("%s\n" % crime_grid for crime_grid in self.flat_data)
+
+        with open("weather_" + file_name, 'w') as csv_file:
+            csv_file.writelines("%s\n" % crime_grid for crime_grid in self.flat_weather_data)
+        print("Data written into weather_" + str(file_name) + ".")
 
     def data_to_tensor(self):
         tensor = torch.zeros(self.time_period_range, self.lat_grid_num, self.lon_grid_num, 1)
@@ -85,12 +106,20 @@ class DataProcessor:
                     self.flat_data.append(lon)
         del self.data
 
+    def flat_read_weather_data(self):
+        for period in self.weather_data:
+            for lat in period:
+                for lon in lat:
+                    self.flat_weather_data.append(lon)
+        del self.data
+
     def divide_time_periods(self):
         date_range = self.end_time - self.start_time
         date_range_hour = int(self.second_to_hour(date_range))
         self.time_period_range = int(date_range_hour / self.time_period)
         for period in range(self.time_period_range):
             self.data.append(self.get_grid_matrix(period))
+            self.weather_data.append(self.get_grid_matrix(period))
 
     def divide_grid_descriptions(self):
         self.lat_grid_range = float((self.max_lat - self.min_lat) / self.lat_grid_num)
@@ -146,6 +175,13 @@ class DataProcessor:
             period = math.floor(time_period / self.time_period)
             return period
 
+    def row_to_period_weather(self, row):
+        if row[1]:
+            time = self.get_time_weather(row)
+            time_period = self.second_to_hour(time - self.start_time)
+            period = math.floor(time_period / self.time_period)
+            return period
+
     def row_to_grid(self, row):
         diff_lat = float(row[19]) - self.min_lat
         lat_grid = math.floor(diff_lat / self.lat_grid_range)
@@ -160,3 +196,7 @@ class DataProcessor:
     @staticmethod
     def get_time(row):
         return int(datetime.strptime(row[2], "%m/%d/%Y %I:%M:%S %p").timestamp())
+
+    @staticmethod
+    def get_time_weather(row):
+        return int(datetime.strptime(row[2], "%Y-%m-%d %I:%M:%S").timestamp())

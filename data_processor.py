@@ -14,8 +14,8 @@ class DataProcessor:
         self.time_period = time_period
         self.lat_grid_num = lat_grid_num
         self.lon_grid_num = lon_grid_num
-        self.min_lat, self.max_lat = 36.619446395, 42.022910333
-        self.min_long, self.max_long = -91.686565684, -87.524529378
+        self.min_lat, self.max_lat = 41.6100, 42.042910333
+        self.min_long, self.max_long = -87.939568, -87.501442
         self.lat_grid_range = float(0)
         self.lon_grid_range = float(0)
         self.grid_values = None

@@ -3,23 +3,24 @@ Main script for testing the model flow.
 """
 import config
 from models.tree_cnn import TreeCNN
-from data_processor import DataProcessor
-from fake_data_generator import generate_batch
-import matplotlib.pyplot as plt
+from transformers import WeatherTransformer, CrimeTransformer
+from batch_generator import BatchGenerator
 
 if __name__ == "__main__":
-    data_processor = DataProcessor(24, 10, 8)
+    params = config.DataParams().__dict__
+    params.update({"file_name": params["weather_file"]})
+    weather_transform = WeatherTransformer(params)
+    weather_data = weather_transform.load_data("processed_weather")
 
-    crime_tensor, weather_tensor = data_processor.read_file_to_tensor("crimes")
+    params.update({"file_name": params["crime_file"]})
+    crime_transform = CrimeTransformer(params)
+    crime_data = crime_transform.load_data("processed_crime")
+    batch_generator = BatchGenerator(params, crime_data, weather_data)
 
     params = config.TreeCNNParams().__dict__
-
     model = TreeCNN(params)
 
     for e in range(150):
-        x, y = generate_batch(config.INPUT_WINDOW_LEN,
-                              config.KSTEP,
-                              params["batch_size"],
-                              config.INPUT_SIZE)
+        x, w, y = batch_generator.get_batch("train")
         loss = model.fit(x, y)
         print("Loss: " + str(float(loss)))

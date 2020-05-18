@@ -63,7 +63,7 @@ class CrimeTransformer(Transformer):
 
             tensor_data[t_ind, x_ind, y_ind, 0] += 1
 
-        return (tensor_data - tensor_data.mean()) / tensor_data.var()
+        return tensor_data
 
     def preread_data(self):
         raw_data = pd.read_csv(self.file_path)

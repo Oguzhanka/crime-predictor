@@ -8,6 +8,12 @@ import os
 
 class Transformer:
     def __init__(self, params):
+        """
+        Base transformer class implementation. Will be used by the Crime and Weather transformer
+        classes. During the initialization, raw csv fill be read and cropped according to the
+        parameters.
+        :param params: Dictionary of parameters.
+        """
         self.file_path = "./data/" + params["file_name"] + ".csv"
 
         self.start_date = params["start_date"]
@@ -24,6 +30,10 @@ class Transformer:
         self.preread_data()
 
     def compute_bounds(self):
+        """
+        Computes the latitude and longitude widths for the given data file and spatial resolution.
+        :return: None
+        """
         lat_width = (self.spatial_boundaries[0][1] - self.spatial_boundaries[0][0]) / self.spatial_resolution[0]
         lon_width = (self.spatial_boundaries[1][1] - self.spatial_boundaries[1][0]) / self.spatial_resolution[1]
 
@@ -31,12 +41,26 @@ class Transformer:
         self.lon_width = lon_width
 
     def preread_data(self):
+        """
+        Called during the initialization phase. If the raw data file exists, it will be read and cropped.
+        :return: None
+        """
         raise NotImplementedError
 
     def transform(self):
+        """
+        Main transform function called to convert the raw records file to the tensor of data.
+        :return: None
+        """
         raise NotImplementedError
 
     def load_data(self, data_path):
+        """
+        If the data was converted before, loads the converted file from the specified directory. Otherwise,
+        transforms the data and dumps the converted file to the specified location.
+        :param data_path: Path of the file.
+        :return: Transformed data.
+        """
         if os.path.exists("./data/" + data_path + ".pkl"):
             tensor_data = pickle.load(open("./data/" + data_path + ".pkl", "rb"))
         else:
@@ -47,25 +71,44 @@ class Transformer:
 
 class CrimeTransformer(Transformer):
     def __init__(self, params):
+        """
+        Crime transformer class implementation. Extends the base transformer class defined here.
+        :param params: Dictionary of parameters.
+        """
         super(CrimeTransformer, self).__init__(params)
         self.params = params
         self.preread_data()
 
     def transform(self):
+        """
+        Transform function called during the load_data function. Uses the cropped raw data to bin
+        records into the spatiotemporal cells.
+        :return: Transformed data.
+        """
         num_temp_grids = int((self.end_date - self.start_date).total_seconds() // 3600 / self.temporal_resolution + 1)
         tensor_data = torch.zeros((num_temp_grids, *self.spatial_resolution, 1))
 
         min_data = self.data["Date"].min()
-        for i, row in self.data.iterrows():
+        for i, row in self.data.iterrows():     # For each data row...
+            # Compute the temporal index.
             t_ind = int((row["Date"] - min_data).total_seconds() // 3600 / self.temporal_resolution)
+
+            # Compute the vertical index in space.
             x_ind = int((self.spatial_boundaries[0][1] - row["Latitude"]) / self.lat_width)
+
+            # Compute the horizontal index in space.
             y_ind = self.spatial_resolution[1] - 1 - int((self.spatial_boundaries[1][1] - row["Longitude"]) / self.lon_width)
 
-            tensor_data[t_ind, x_ind, y_ind, 0] += 1
+            tensor_data[t_ind, x_ind, y_ind, 0] += 1    # Place the record in the data.
 
         return tensor_data
 
     def preread_data(self):
+        """
+        Data reading during the initialization stage. Outlier data and specified temporal interval
+        is cropped from the data.
+        :return: None.
+        """
         raw_data = pd.read_csv(self.file_path)
         filtered_data = raw_data[["Date", "Latitude", "Longitude"]]
         filtered_data["Date"] = pd.to_datetime(filtered_data["Date"])
@@ -81,15 +124,28 @@ class CrimeTransformer(Transformer):
 
 class WeatherTransformer(Transformer):
     def __init__(self, params):
+        """
+        Weather transformer class implementation. Extends the base transformer class. defined here.
+        :param params: Dictionary of parameters.
+        """
         super(WeatherTransformer, self).__init__(params)
         self.params = params
 
     def preread_data(self):
+        """
+        Data reading during the initialization stage. Outlier data and specified temporal interval
+        is cropped from the data.
+        :return: None.
+        """
         raw_data = pd.read_csv(self.file_path)
         raw_data["Date"] = pd.to_datetime(raw_data["Date"])
         self.data = raw_data
 
     def transform(self):
+        """
+        Transform function called by the load_data function.
+        :return: Transformed weather data.
+        """
         self.data = pd.get_dummies(self.data, columns=["Chicago"])
         num_temp_grids = int((self.end_date - self.start_date).total_seconds() // 3600 / self.temporal_resolution + 1)
         num_dims = 33

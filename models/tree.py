@@ -17,14 +17,14 @@ class Tree(nn.Module):
         super(Tree, self).__init__()
         self.params = params
 
-        self.depth = params["depth"]
-        self.num_regions = 2 ** params["depth"]
-        self.num_features = params["num_features"]
-        self.boundaries = params["boundaries"]
+        self.depth = params["depth"]                    # Depth of the tree.
+        self.num_regions = 2 ** params["depth"]         # Number of regions.
+        self.num_features = params["num_features"]      # Default to 2. (latitude and longitude)
+        self.boundaries = params["boundaries"]          # Boundaries of the spatial region.
         self.input_size = params["input_size"]
 
-        self.hardness = params["hardness"]
-        self.region_mode = params["region_mode"]
+        self.hardness = params["hardness"]              # Controls the soft boundaries between the regions.
+        self.region_mode = params["region_mode"]        # Initialization mode.
         self.region_rot = params["region_rot"]
 
         self.tree_layers = []
@@ -47,16 +47,16 @@ class Tree(nn.Module):
         product_score = torch.ones(1, self.num_regions)
         prev_score = torch.ones(1, self.num_regions)
 
-        for level in range(self.depth):
-            level_score = torch.ones(self.num_regions)
-            weighted_score = torch.matmul(self.tree_layers[level], input_tensor)
-            biased_score = torch.add(weighted_score, self.tree_bias[level])
-            exped_score = torch.sigmoid(biased_score).repeat(1, 2).view(-1, 1)
+        for level in range(self.depth):                                             # For each level...
+            level_score = torch.ones(self.num_regions)                              # Initialize the scores map.
+            weighted_score = torch.matmul(self.tree_layers[level], input_tensor)    # Weighted scores.
+            biased_score = torch.add(weighted_score, self.tree_bias[level])         # Bias added.
+            exped_score = torch.sigmoid(biased_score).repeat(1, 2).view(-1, 1)      # Predictions after gate.
             node_score = torch.sub(self.tree_score[level], exped_score)
             child_score = torch.mul(node_score, self.sign_score[level])
 
-            for i in range(self.num_regions):
-                level_score[i] = child_score[i // (self.num_regions // 2 ** (level + 1))]
+            for i in range(self.num_regions):                                       # For each subregion...
+                level_score[i] = child_score[i // (self.num_regions // 2 ** (level + 1))]   # Leaf scores are computed.
 
             product_score = torch.mul(prev_score, level_score)
             prev_score = product_score.clone()

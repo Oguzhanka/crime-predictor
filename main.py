@@ -59,7 +59,7 @@ if __name__ == "__main__":
     ax = fig.add_subplot(111)
     plt.draw()
 
-    for e in range(1500):                               # For every epoch...
+    for e in range(config.EPOCHS):                               # For every epoch...
         x, w, y = batch_generator.get_batch("train")    # Read training data.
         loss = model.fit(x, w, y)                       # Perform update on the training data. Also compute loss.
         print("EPOCH: {}".format(e))                    # Print the epoch number.
@@ -69,6 +69,10 @@ if __name__ == "__main__":
         x, w, y = batch_generator.get_batch("validation")   # Get the validation set.
         y_hat = model.predict(x, w)                         # Compute the predictions for the validation set.
         pr_curve(y_hat, y, ax)                              # Compute the AP score for the validation score.
+
+    x, w, y = batch_generator.get_batch("test")   # Get the test set.
+    y_hat = model.predict(x, w)                   # Compute the predictions for the test set.
+    pr_curve(y_hat, y, ax)                        # Compute the AP score for the test score.
 
 plt.ioff()
 plt.show()

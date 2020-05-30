@@ -11,6 +11,8 @@ INPUT_WINDOW_LEN = 0
 KSTEP = 1
 MODEL_TYPE = "treeconv"
 
+EPOCHS = 200
+
 
 class DataParams:
     """

@@ -48,7 +48,7 @@ for different models and data preprocessing methods. After setting up the config
 the model could be trained with the following command:
 
 ```
-python main.py
+python3 main.py
 ```
 
 After the above command is executed, model loss will be reported after each epoch. Moreover, PR curve on the validation

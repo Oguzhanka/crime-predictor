@@ -43,8 +43,9 @@ same time and space.
     
 ## How to use?
 
-After setting up the configuration file with the desired parameters, the model could be trained with the following 
-command:
+First the configuration file should be tuned. Configuration file consists of different sections of hyperparameters
+for different models and data preprocessing methods. After setting up the configuration file with the desired parameters,
+the model could be trained with the following command:
 
 ```
 python main.py
